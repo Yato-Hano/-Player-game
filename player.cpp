@@ -52,10 +52,14 @@ void Space::move_bullets(sf::Time t)
         {
             if (are_collide(current->first,*bubble)) {
                 auto temp = std::next(bubble);
-                if(0.03<bubble->getScale().x){
+                if(0.03<bubble->getScale().x)
+                {
                     auto pos = bubble->getPosition();
-                    m_bubbles.emplace_back(sf::Vector2f{ pos.x - 20,pos.y-20 }, m_bubble_texture, (bubble->getScale().x / 2));
-                    m_bubbles.emplace_back(sf::Vector2f{ pos.x + 20,pos.y+20 }, m_bubble_texture, (bubble->getScale().x / 2));
+                    m_bubbles.emplace_back(pos, m_bubble_texture, (bubble->getScale().x / 2));
+                    m_bubbles.emplace_back(pos, m_bubble_texture, (bubble->getScale().x / 2));
+                    // make them not overlap
+                    while (are_collide(*std::prev(m_bubbles.end(), 1), *std::prev(m_bubbles.end(), 2)))
+                        m_bubbles.back().move(t);
                 }
                 m_bubbles.erase(bubble);
                 bubble = temp;
