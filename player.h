@@ -1,5 +1,7 @@
 #pragma once
 /*
+* Move with WASD, sprint with Shift, shoot with mouse click.
+* Bubbles multiply on pop.
 */
 #include <SFML/Graphics.hpp>
 #include <format>
@@ -18,6 +20,7 @@ inline int rand_int(int min, int max)
     return std::uniform_int_distribution<>{min, max}(ran);
 }
 //--------------------------------------------------------------------------------------------
+// can  move
 class Player : public sf::Drawable
 {
 public:
@@ -26,14 +29,14 @@ public:
     sf::Vector2f getPosition() const {  return m_body.getPosition();  }
     const auto& getRadius() const { return m_radius; }
 
-    void speed_up() { m_speed *= 3; };
-    void slow_down() { m_speed /= 3; };
-    inline void operator()(sf::Time);
+    void speed_up() { m_speed *= 3; }; // Shift pressed
+    void slow_down() { m_speed /= 3; }; // Shift released
+    inline void operator()(sf::Time); // moves on every stored engles
     
-    inline void remove_movement(sf::Angle angle);
-    inline void add_movement(sf::Angle angle);
+    inline void remove_movement(sf::Angle angle); // KeyReleased
+    inline void add_movement(sf::Angle angle);// KeyPressed 
 private:
-    std::list<sf::Angle> m_movement_angles;
+    std::list<sf::Angle> m_movement_angles; // 1 angle per pressed button
     float m_radius{ 16 };
     float m_speed{ 100 };
     sf::CircleShape m_body;
@@ -46,6 +49,7 @@ private:
 };
 
 //--------------------------------------------------------------------------------------------
+//colliding bubble multiplyed when poped
 class Bubble : public sf::Drawable
 {
 public:
@@ -56,13 +60,10 @@ public:
 
     sf::Vector2f getPosition() const { return m_sprite.getPosition(); }
 
-    void restore_position() { m_sprite.setPosition(m_saved_position); };
     void set_position(const sf::Vector2f& p) { m_sprite.setPosition(p); }
-    void move(sf::Time t) { m_saved_position = m_sprite.getPosition(); m_sprite.move({ t.asSeconds() * m_speed,m_angle }); }
+    void move(sf::Time t) { m_sprite.move({ t.asSeconds() * m_speed,m_angle }); }
     float m_speed{ 120 };
     sf::Angle m_angle{ sf::degrees(rand_int(0,360)) };
-protected:
-    sf::Vector2f m_saved_position;
 private:
     sf::Sprite m_sprite;
     void draw(sf::RenderTarget& target, sf::RenderStates states) const override
@@ -71,11 +72,12 @@ private:
     }
 };
 //--------------------------------------------------------------------------------------------
+//Bullets that were shot, it can be multiple oon the screen, move faster than player
 class Bullets : public sf::Drawable
 {
 public:
-    inline void shoot_direction(sf::Vector2f from, sf::Angle angle);
-    auto& control_bullets() { return m_bullets; }
+    inline void shoot_direction(sf::Vector2f from, sf::Angle angle); // lounch a bullet
+    auto& control_bullets() { return m_bullets; } // for controolling its lifetime
     const float m_radius{ 3 };
     const float m_speed{ 100 * 6 };
 private:
@@ -89,19 +91,25 @@ private:
     }
 };
 //--------------------------------------------------------------------------------------------
+// input for the Player. adds/removes movements, and (only)lounches bullets
+class Input_Handler
+{
+public:
+    Input_Handler(Player&, Bullets&);
+    inline void operator()(sf::Event::MouseButtonPressed&);
+    inline void operator()(sf::Event::KeyPressed& k);
+    inline void operator()(sf::Event::KeyReleased& k);
+private:
+    Player& m_player;
+    Bullets& m_bullets;
+};
+//--------------------------------------------------------------------------------------------
+// Space knows about every object, time and responsible for movement, and lifetime of objects
 class Space :public sf::Drawable
 {
 public:
     Space(Bullets&, Player&, sf::Vector2u);
-
-    void tick_iteration() 
-    {
-       auto time_elapced = m_clock.restart();
-
-       move_bullets(time_elapced);
-       m_player(time_elapced);
-       move_bubbles(time_elapced);
-    }
+    inline void tick_iteration(); // call each frame
     std::list<Bubble> m_bubbles;
 private:
     inline void move_bullets(sf::Time t);
@@ -119,19 +127,9 @@ private:
             target.draw(c, states);
     }
 };
+
 //--------------------------------------------------------------------------------------------
-class Input_Handler
-{
-public:
-    Input_Handler(Player& , Bullets& );
-    inline void operator()(sf::Event::MouseButtonPressed&);
-    inline void operator()(sf::Event::KeyPressed& k);
-    inline void operator()(sf::Event::KeyReleased& k);
-private:
-    Player& m_player;
-    Bullets& m_bullets;
-};
-//--------------------------------------------------------------------------------------------
+// just a textual timer for viewiwing time
 class Timer : public sf::Drawable
 {
 public:
