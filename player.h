@@ -53,18 +53,22 @@ private:
 class Bubble : public sf::Drawable
 {
 public:
-    Bubble(const sf::Vector2f& pos, const sf::Texture& t,float scale = 0.15);
+    Bubble(const sf::Vector2f& pos, const sf::Texture&, sf::Angle,float scale = 0.15);
   
-    float getRadius() const;
-    auto getScale() const { return m_sprite.getScale(); }
+    const float& getRadius() const { return m_radius; }
+    const float& getScale() const { return m_scale_x; }
 
     sf::Vector2f getPosition() const { return m_sprite.getPosition(); }
 
     void set_position(const sf::Vector2f& p) { m_sprite.setPosition(p); }
     void move(sf::Time t) { m_sprite.move({ t.asSeconds() * m_speed,m_angle }); }
+    void move_xy(const sf::Vector2f& xy) { m_sprite.move(xy); }
+    void move_by(float distance) { m_sprite.move({ distance,m_angle }); }
     float m_speed{ 120 };
-    sf::Angle m_angle{ sf::degrees(rand_int(0,360)) };
+    sf::Angle m_angle;
 private:
+    float m_radius;
+    float m_scale_x;
     sf::Sprite m_sprite;
     void draw(sf::RenderTarget& target, sf::RenderStates states) const override
     {

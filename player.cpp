@@ -5,17 +5,10 @@ bool are_collide(const A& a, const B& b)
 {
     return (a.getPosition() - b.getPosition()).length() <= a.getRadius() + b.getRadius();
 }
-sf::Vector2f rand_pos(sf::Vector2u bounds)
+sf::Vector2f rand_pos(float radius, sf::Vector2u bounds)
 {
-    return sf::Vector2f(rand_int(50, bounds.x - 50), rand_int(50, bounds.y - 50));
-}
-void push_away(Bubble& a, Bubble& b)
-{
-    while (are_collide(a, b)) 
-    {
-        a.move(sf::milliseconds(20));
-        b.move(sf::milliseconds(20));
-    }
+    radius += 5;
+    return sf::Vector2f(rand_int(radius, bounds.x - radius), rand_int(radius, bounds.y - radius));
 }
 enum class Window_Collision {none,vertical,horizotal};
 Window_Collision window_collision(sf::Vector2f pos,float radius, sf::Vector2u bounds)
@@ -37,53 +30,83 @@ Space::Space(Bullets&b,  Player& p, sf::Vector2u bounds)
     :m_bullets{b},m_player{p},m_bounds{ bounds },m_text{font}
 {
     m_text.setFillColor(sf::Color::White);
-    m_text.setPosition({ 250,0 });
+    m_text.setPosition({ 300,0 });
 
     for (short i = 0; i < 10; i++)
     {
-        m_bubbles.emplace_back(rand_pos(bounds), m_bubble_texture);
+        auto& b = m_bubbles.emplace_back(sf::Vector2f{}, m_bubble_texture, sf::degrees(rand_int(0, 360)));
+        b.set_position(rand_pos(b.getRadius(), bounds));
     }
     m_text.setString(std::format("There are {} bubbles now", m_bubbles.size()));
 
     // make them not overlap
     for (auto current = m_bubbles.begin(); current != m_bubbles.end(); ++current)
         for (auto next = std::next(current); next != m_bubbles.end(); ++next)
-            push_away(*current, *next);
-
+        {
+            if(are_collide(*current,*next))
+                 current->set_position(rand_pos(current->getRadius(), m_bounds));
+        }
     m_clock.start();
 }
 
+// change bubbles directions and speeds, moves them apart
+void resolve(Bubble& a, Bubble& b)
+{
+    sf::Vector2f delta{ a.getPosition() - b.getPosition() };
+    float dist{ delta.length() };
+    if (dist == 0) return; 
+
+    sf::Vector2f normal{ delta.normalized() };
+    sf::Vector2f push{ normal * (((a.getRadius()+b.getRadius())-dist)/2)};
+    if( 3.f < push.length())
+    {
+        a.move_xy(push);
+        b.move_xy(-push);
+    }
+
+    sf::Vector2f va{ a.m_speed, a.m_angle };
+    sf::Vector2f vb{ b.m_speed, b.m_angle };
+    if (0 < (va - vb).dot(normal)) return;
+
+    sf::Angle mirror{ normal.angle() * 2 - sf::degrees(180) };
+    a.m_angle = mirror - a.m_angle;
+    b.m_angle = mirror - b.m_angle;
+
+    std::swap(a.m_speed, b.m_speed);
+}
 // check and relosve bubble-bullet/window-bullet collision. 
 // edit bubble's size/speed/limit after division here (at m_bubbles.emplace_back)
 void Space::move_bullets(sf::Time t)
 {
     auto& view_bullets = m_bullets.control_bullets();
     auto movement = m_bullets.m_speed * t.asSeconds();
-    for (auto current = view_bullets.begin(); current != view_bullets.end(); )
+
+
+    for (auto bullet = view_bullets.begin(); bullet != view_bullets.end(); )
     {
-        current->first.move({ movement, current->second });
+        bullet->first.move({ movement, bullet->second });
+        auto bullet_2x = bullet->first.getRadius() * 2;
 
         //check and relosve bubble-bullet collision
         for (auto bubble = m_bubbles.begin(); bubble != m_bubbles.end(); )
         {
-            if (are_collide(current->first,*bubble)) {
+            if (are_collide(bullet->first,*bubble)) {
                 auto temp = std::next(bubble);
                 //---------------------------------------
                 // devide to a limit
-                // change limit here ------------->
-                if (0.03 < bubble->getScale().x)
+                if (bullet_2x < bubble->getRadius())  // <-------- change limit here
                 {
-                    auto pos = bubble->getPosition();
-                    //change size/speed here ------------->
-                    float divisor = 1.5;
-                    
-                    m_bubbles.emplace_back(pos, m_bubble_texture, (bubble->getScale().x / divisor));
-                    m_bubbles.back().m_speed /= divisor;
-                    m_bubbles.emplace_back(pos, m_bubble_texture, (bubble->getScale().x / divisor));
-                    m_bubbles.back().m_speed /= divisor;
+                    const auto pos = bubble->getPosition();
+                    constexpr float divisor = 1.5; // <----------- change size/speed here 
 
-                    // make them not overlap
-                    push_away(*std::prev(m_bubbles.end(), 1), *std::prev(m_bubbles.end(), 2));
+                    m_bubbles.emplace_back(pos, m_bubble_texture, bubble->m_angle, (bubble->getScale() / divisor));
+                    auto& b1 = m_bubbles.back();
+                    b1.m_speed /= divisor;
+
+                    m_bubbles.emplace_back(pos, m_bubble_texture, -bubble->m_angle, (bubble->getScale() / divisor));
+                    auto& b2 = m_bubbles.back();
+                    b2.m_speed /= divisor;
+                    //----------------------
                 }
                 //---------------------------------------
                 m_bubbles.erase(bubble);
@@ -92,24 +115,15 @@ void Space::move_bullets(sf::Time t)
         }
 
         //check and relosve window-bullet collision
-        if (Window_Collision::none!=window_collision(current->first.getPosition(), m_bullets.m_radius,m_bounds))
+        if (Window_Collision::none!=window_collision(bullet->first.getPosition(), m_bullets.m_radius,m_bounds))
         {
-            auto temp = std::next(current);
-            view_bullets.erase(current);
-            current = temp;
+            auto temp = std::next(bullet);
+            view_bullets.erase(bullet);
+            bullet = temp;
         }
-        else ++current;
+        else ++bullet;
     }
     m_text.setString(std::format("There are {} bubbles now", m_bubbles.size()));
-}
-// change bubbles directions and speeds
-void resolve(Bubble& a, Bubble& b)
-{
-    const auto dist = a.getPosition() - b.getPosition();
-    const sf::Angle mirror{ dist.angle() * 2 + sf::degrees(180) };
-    a.m_angle = mirror - a.m_angle;
-    b.m_angle = mirror - b.m_angle;
-    std::swap(a.m_speed, b.m_speed);
 }
 
 //move, check and relosve bubble-bubble/bubble-Window collisions
@@ -125,9 +139,11 @@ void Space::move_bubbles(sf::Time t)
             break;
         case Window_Collision::vertical:
             current->m_angle = -current->m_angle;
+            current->move_by(5);
             break;
         case Window_Collision::horizotal:
             current->m_angle = sf::degrees(180) - current->m_angle;
+            current->move_by(5);
             break;
         }
     }
@@ -139,25 +155,20 @@ void Space::move_bubbles(sf::Time t)
             if (are_collide(*current, *next))
             {
                 resolve(*current, *next);
-                push_away(*current, *next);
             }
         }
    }
 }
 //--------------------------------------------
-Bubble::Bubble(const sf::Vector2f& pos, const sf::Texture& t,float scale)
-    :m_sprite{ t }
+Bubble::Bubble(const sf::Vector2f& pos, const sf::Texture& t, sf::Angle a, float scale)
+    :m_sprite{ t }, m_angle{ a }
 {
     set_position(pos);
     m_sprite.setOrigin(m_sprite.getLocalBounds().size/2.f);
     m_sprite.scale({ scale,scale });
-}
-float Bubble::getRadius() const
-{
-    sf::FloatRect local = m_sprite.getLocalBounds();
-    sf::Vector2f scale = m_sprite.getScale();
-    float radius = local.size.x * scale.x / 2.f;
-    return radius;
+
+    m_scale_x = scale;
+    m_radius = m_sprite.getLocalBounds().size.x * m_scale_x / 2.f;
 }
 //--------------------------------------------
 void Bullets::shoot_direction(sf::Vector2f from, sf::Angle angle)
@@ -253,7 +264,7 @@ void Timer::set_text_formatted(const std::string& message)
 }
 //--------------------------------------------
 Window::Window()
-    :sf::RenderWindow{ sf::VideoMode{ { 800, 800 } }, "Player",sf::Style::Close ,sf::State::Windowed,sf::ContextSettings{.antiAliasingLevel = 8 } },
+    :sf::RenderWindow{ sf::VideoMode{ { 1200, 800 } }, "Player",sf::Style::Close ,sf::State::Windowed,sf::ContextSettings{.antiAliasingLevel = 8 } },
     m_move_handler{m_player,m_bullets},
     m_space{ m_bullets,m_player,getSize()}
 {
@@ -283,7 +294,6 @@ void Window::show()
     }
 }
 //--------------------------------------------
-
 int main()
 try
 {
