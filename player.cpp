@@ -56,23 +56,24 @@ void resolve(Bubble& a, Bubble& b)
     float dist{ delta.length() };
     if (dist == 0) return; 
 
-    sf::Vector2f normal{ delta.normalized() };
+    sf::Vector2f normal{ delta.normalized() }; 
     sf::Vector2f push{ normal * (((a.getRadius()+b.getRadius())-dist)/2)};
-    if( 3.f < push.length())
+
+    if( 3.f < push.length()) // push only if there is too much of the overlap. otherwise this causes a bug or rapid movement
     {
         a.move_xy(push);
         b.move_xy(-push);
     }
 
-    sf::Vector2f va{ a.m_speed, a.m_angle };
+    sf::Vector2f va{ a.m_speed, a.m_angle }; // veclocity 
     sf::Vector2f vb{ b.m_speed, b.m_angle };
-    if (0 < (va - vb).dot(normal)) return;
+    if (0 < (va - vb).dot(normal)) return; // if not approaching - no nedd to mirror angles
 
     sf::Angle mirror{ normal.angle() * 2 - sf::degrees(180) };
     a.m_angle = mirror - a.m_angle;
     b.m_angle = mirror - b.m_angle;
 
-    std::swap(a.m_speed, b.m_speed);
+    std::swap(a.m_speed, b.m_speed); 
 }
 // check and relosve bubble-bullet/window-bullet collision. 
 // edit bubble's size/speed/limit after division here (at m_bubbles.emplace_back)
