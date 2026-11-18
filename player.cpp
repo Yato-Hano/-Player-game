@@ -26,8 +26,8 @@ void Space::tick_iteration()
     m_player(time_elapced);
     move_bubbles(time_elapced);
 }
-Space::Space(Bullets&b,  Player& p, sf::Vector2u bounds)
-    :m_bullets{b},m_player{p},m_bounds{ bounds },m_text{font}
+Space::Space( sf::Vector2u bounds)
+    :m_bounds{ bounds },m_text{font}
 {
     m_text.setFillColor(sf::Color::White);
     m_text.setPosition({ 300,0 });
@@ -266,8 +266,8 @@ void Timer::set_text_formatted(const std::string& message)
 //--------------------------------------------
 Window::Window()
     :sf::RenderWindow{ sf::VideoMode{ { 1200, 800 } }, "Player",sf::Style::Close ,sf::State::Windowed,sf::ContextSettings{.antiAliasingLevel = 8 } },
-    m_move_handler{m_player,m_bullets},
-    m_space{ m_bullets,m_player,getSize()}
+    m_space{ getSize() },
+    m_move_handler{ m_space.view_player(),m_space.view_bullets()}
 {
     setKeyRepeatEnabled(false);
 }
@@ -287,9 +287,7 @@ void Window::show()
         clear(sf::Color{ 18, 20, 32 });
 
         draw(m_timer);
-        draw(m_bullets);
         draw(m_space);
-        draw(m_player);
 
         display();
     }

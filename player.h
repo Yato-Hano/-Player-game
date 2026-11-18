@@ -108,25 +108,29 @@ private:
     Bullets& m_bullets;
 };
 //--------------------------------------------------------------------------------------------
-// Space knows about every object, time and responsible for movement, and lifetime of objects
+// Space knows about every object, time and responsible for movement
 class Space :public sf::Drawable
 {
 public:
-    Space(Bullets&, Player&, sf::Vector2u);
+    Space(sf::Vector2u);
     inline void tick_iteration(); // call each frame
     std::list<Bubble> m_bubbles;
+    Bullets& view_bullets() { return m_bullets; }
+    Player& view_player() { return m_player; }
 private:
     inline void move_bullets(sf::Time t);
     inline void move_bubbles(sf::Time t);
     sf::Texture m_bubble_texture{ "BubbleSimple.png" };
     sf::Clock m_clock;
     sf::Vector2u m_bounds;
-    Bullets& m_bullets;
-    Player& m_player;
+    Bullets m_bullets;
+    Player m_player;
     sf::Text m_text;
     void draw(sf::RenderTarget& target, sf::RenderStates states) const override
     {
         target.draw(m_text, states);
+        target.draw(m_bullets, states);
+        target.draw(m_player, states);
         for (const auto& c : m_bubbles)
             target.draw(c, states);
     }
@@ -156,10 +160,8 @@ public:
     Window();
     void show();
 private:
-    Bullets m_bullets;
-    Player m_player;
-    Input_Handler m_move_handler;
     Timer m_timer;
     Space m_space;
+    Input_Handler m_move_handler;
 };
 //--------------------------------------------------------------------------------------------
